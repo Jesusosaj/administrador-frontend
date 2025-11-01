@@ -1,0 +1,120 @@
+.main {
+  margin-left: 240px;
+  padding: 32px;
+  background: #f9fafb;
+  min-height: 100vh;
+  font-family: 'Poppins', sans-serif;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 24px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+.searchBox input {
+  border: none;
+  padding: 8px 12px;
+  outline: none;
+  background: transparent;
+}
+
+.searchBox .material-symbols-rounded {
+  color: #6b7280;
+  padding: 8px;
+  cursor: pointer;
+}
+
+.addButton {
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.addButton:hover {
+  background-color: #1e40af;
+  transform: scale(1.02);
+}
+
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  background-color: #fff;
+}
+
+.table th {
+  background: #2c3e50;
+  color: #fff;
+  padding: 12px;
+  text-align: left;
+}
+
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid #ecf0f1;
+}
+
+.table tr:hover {
+  background-color: #f8f9fa;
+}
+
+
+.flyer {
+  width: 80px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.actionsCell {
+  display: flex;
+  gap: 10px;
+}
+
+.iconButton {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px;
+  color: #374151;
+  transition: color 0.2s, transform 0.2s;
+}
+
+.iconButton:hover {
+  color: #2563eb;
+  transform: scale(1.1);
+}
+
+.material-symbols-rounded {
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 500,
+    "GRAD" 0,
+    "opsz" 24;
+}
