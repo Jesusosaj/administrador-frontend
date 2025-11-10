@@ -4,10 +4,10 @@ import { useState, useEffect } from "react";
 import Sidebar from "../components/Header";
 import styles from "./page.module.css";
 
-const API_URL = "http://localhost:8080/v1/azzar/empresas-afiliadas";
-const API_URL_INSERT = "http://localhost:8080/v1/azzar/empresas-afiliadas/registrar";
-const API_URL_UPDATE = "http://localhost:8080/v1/azzar/empresas-afiliadas/actualizar";
-const API_URL_DELETE = "http://localhost:8080/v1/azzar/empresas-afiliadas/eliminar";
+const API_URL = "http://148.230.72.52:8080/v1/azzar/empresas-afiliadas";
+const API_URL_INSERT = "http://148.230.72.52:8080/v1/azzar/empresas-afiliadas/registrar";
+const API_URL_UPDATE = "http://148.230.72.52:8080/v1/azzar/empresas-afiliadas";
+const API_URL_DELETE = "http://148.230.72.52:8080/v1/azzar/empresas-afiliadas";
 
 export default function EmpresasPage() {
   const [empresas, setEmpresas] = useState<any[]>([]);
@@ -17,12 +17,14 @@ export default function EmpresasPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingEmpresa, setEditingEmpresa] = useState<any>(null);
 
+  // Modal de confirmación de eliminación
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [empresaToDelete, setEmpresaToDelete] = useState<any>(null);
+
   const [empresaForm, setEmpresaForm] = useState({
     nombre: "",
     fechaDesde: "",
-    fechaHasta: "",
-    usuarioIngreso: "",
-    passwordIngreso: ""
+    fechaHasta: ""
   });
 
   useEffect(() => {
@@ -52,52 +54,53 @@ export default function EmpresasPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
+
     try {
-      const url = editingEmpresa ? API_URL_UPDATE : API_URL_INSERT;
-      const method = editingEmpresa ? "PUT" : "POST";
-      const body = {
-        id: editingEmpresa?.ID_EMPRESA,
-        nombre: empresaForm.nombre,
-        fechaDesde: empresaForm.fechaDesde,
-        fechaHasta: empresaForm.fechaHasta,
+      const empresaBody = {
+        nombreEmpresa: empresaForm.nombre,
+        fechaDesdeAlquiler: empresaForm.fechaDesde,
+        fechaHastaAlquiler: empresaForm.fechaHasta,
       };
 
-      const res = await fetch(url, {
+      const url = editingEmpresa ? `${API_URL_UPDATE}/${editingEmpresa.idEmpresa}` : API_URL_INSERT;
+      const method = editingEmpresa ? "PUT" : "POST";
+
+      const resEmpresa = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(empresaBody),
       });
 
-      if (!res.ok) throw new Error("Error al guardar la empresa");
+      if (!resEmpresa.ok) throw new Error(editingEmpresa ? "Error al actualizar la empresa" : "Error al registrar la empresa");
 
       await fetchEmpresas();
+
       setShowModal(false);
       setEditingEmpresa(null);
-      setEmpresaForm({ nombre: "", fechaDesde: "", fechaHasta: "" });
+      setEmpresaForm({
+        nombre: "",
+        fechaDesde: "",
+        fechaHasta: ""
+      });
     } catch (err: any) {
+      console.error(err);
       setError(err.message);
+      alert(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEdit = (empresa: any) => {
-    setEditingEmpresa(empresa);
-    setEmpresaForm({
-      nombre: empresa.nombreEmpresa,
-      fechaDesde: new Date(empresa.fechaDesdeAlquiler).toISOString().split("T")[0],
-      fechaHasta: new Date(empresa.echaHastaAlquiler).toISOString().split("T")[0],
-    });
-    setShowModal(true);
-  };
-
-  const handleDelete = async (id: number) => {
-    if (!confirm("¿Seguro que deseas eliminar esta empresa?")) return;
+  const handleDelete = async () => {
+    if (!empresaToDelete) return;
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL_DELETE}?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`${API_URL_DELETE}/${empresaToDelete.idEmpresa}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Error al eliminar la empresa");
       await fetchEmpresas();
+      setShowDeleteModal(false);
+      setEmpresaToDelete(null);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -106,11 +109,10 @@ export default function EmpresasPage() {
   };
 
   const filteredEmpresas = empresas.filter((e) => {
-    const nombre = e.nombreEmpresa || ""; // <-- evita undefined
+    const nombre = e.nombreEmpresa || "";
     const id = e.idEmpresa?.toString() || "";
     return nombre.toLowerCase().includes(search.toLowerCase()) || id.includes(search);
-    });
-
+  });
 
   return (
     <>
@@ -139,7 +141,7 @@ export default function EmpresasPage() {
               className={styles.searchInput}
             />
           </div>
-          <button className={styles.addButton} onClick={() => setShowModal(true)}>
+          <button className={styles.addButton} onClick={() => { setShowModal(true); setEditingEmpresa(null); }}>
             <span className="material-symbols-outlined">add_circle</span> Nueva Empresa
           </button>
         </div>
@@ -159,8 +161,8 @@ export default function EmpresasPage() {
                 <tr>
                   <th>ID</th>
                   <th>Nombre</th>
-                  <th>Desde</th>
-                  <th>Hasta</th>
+                  <th>Alquiler desde</th>
+                  <th>Alquiler hasta</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
@@ -173,13 +175,32 @@ export default function EmpresasPage() {
                       <td>{new Date(e.fechaDesdeAlquiler).toLocaleDateString("es-ES")}</td>
                       <td>{new Date(e.fechaHastaAlquiler).toLocaleDateString("es-ES")}</td>
                       <td className={styles.actionsCell}>
-                        <button title="Editar" className={styles.iconButton}>
-                            <span className="material-symbols-outlined">edit</span>
+                        <button
+                          title="Editar"
+                          className={styles.iconButton}
+                          onClick={() => {
+                            setEditingEmpresa(e);
+                            setEmpresaForm({
+                              nombre: e.nombreEmpresa,
+                              fechaDesde: e.fechaDesdeAlquiler.slice(0, 10),
+                              fechaHasta: e.fechaHastaAlquiler.slice(0, 10)
+                            });
+                            setShowModal(true);
+                          }}
+                        >
+                          <span className="material-symbols-outlined">edit</span>
                         </button>
-                        <button title="Eliminar" className={styles.iconButton}>
-                            <span className="material-symbols-outlined">delete</span>
+                        <button
+                          title="Eliminar"
+                          className={styles.iconButton}
+                          onClick={() => {
+                            setEmpresaToDelete(e);
+                            setShowDeleteModal(true);
+                          }}
+                        >
+                          <span className="material-symbols-outlined">delete</span>
                         </button>
-                       </td>
+                      </td>
                     </tr>
                   ))
                 ) : (
@@ -194,79 +215,97 @@ export default function EmpresasPage() {
           </div>
         )}
 
-        {/* Modal */}
+        {/* Modal Crear/Editar */}
         {showModal && !loading && (
           <div className={styles.modal}>
             <div className={styles.modalContent}>
-              <h2>{editingEmpresa ? "Editar Empresa" : "Nueva Empresa"}</h2>
+              <h2 className={styles.modalTitle}>
+                {editingEmpresa ? "Editar Empresa" : "Nueva Empresa"}
+              </h2>
               <form onSubmit={handleSubmit} className={styles.form}>
-                <label className={styles.inputsLabel}>
-                  <span className={styles.inputsSpan}>Nombre de la empresa</span>
+                <label className={styles.inputLabel}>
+                  Nombre de la Empresa
                   <input
                     type="text"
                     name="nombre"
                     placeholder="Nombre de la empresa"
                     value={empresaForm.nombre}
                     onChange={handleChange}
+                    className={styles.inputText}
                     required
                   />
                 </label>
-                <label className={styles.inputsLabel}>
-                  <span className={styles.inputsSpan}>Fecha desde alquiler</span>
+
+                <label className={styles.inputLabel}>
+                  Fecha desde alquiler
                   <input
                     type="date"
                     name="fechaDesde"
                     value={empresaForm.fechaDesde}
                     onChange={handleChange}
+                    className={styles.inputText}
                     required
                   />
                 </label>
-                
-                <label className={styles.inputsLabel}>
-                  <span className={styles.inputsSpan}>Fecha hasta alquiler</span>
+
+                <label className={styles.inputLabel}>
+                  Fecha hasta alquiler
                   <input
                     type="date"
                     name="fechaHasta"
                     value={empresaForm.fechaHasta}
                     onChange={handleChange}
+                    className={styles.inputText}
                     required
                   />
                 </label>
 
-                <label className={styles.inputsLabel}>
-                  <span className={styles.inputsSpan}>Usuario ingreso</span>
-                  <input
-                    placeholder="Usuario..."
-                    type="text"
-                    name="usuarioIngreso"
-                    value={empresaForm.usuarioIngreso}
-                    onChange={handleChange}
-                    required
-                  />
-                </label>
-                <label className={styles.inputsLabel}>
-                  <span className={styles.inputsSpan}>Contraseña ingreso</span>
-                  <input
-                    placeholder="Contraseña..."
-                    type="text"
-                    name="passwordIngreso"
-                    value={empresaForm.passwordIngreso}
-                    onChange={handleChange}
-                    required
-                  />
-                </label>
                 <div className={styles.modalActions}>
-                  <button type="button" onClick={() => {setShowModal(false); setEditingEmpresa(null)}} className={styles.cancelButton}>
+                  <button
+                    type="button"
+                    onClick={() => { setShowModal(false); setEditingEmpresa(null); }}
+                    className={`${styles.btn} ${styles.cancelButton}`}
+                  >
                     Cancelar
                   </button>
-                  <button type="submit" className={styles.saveButton}>
-                    Guardar
+                  <button
+                    type="submit"
+                    className={`${styles.btn} ${styles.saveButton}`}
+                  >
+                    {editingEmpresa ? "Actualizar" : "Registrar"}
                   </button>
                 </div>
               </form>
             </div>
           </div>
         )}
+
+        {/* Modal Confirmación Eliminación */}
+        {showDeleteModal && empresaToDelete && (
+          <div className={styles.modal}>
+            <div className={styles.modalContent}>
+              <h2 className={styles.modalTitle}>Eliminar Empresa</h2>
+              <p>¿Seguro que deseas eliminar la empresa <b>{empresaToDelete.nombreEmpresa}</b>?</p>
+              <div className={styles.modalActions}>
+                <button
+                  type="button"
+                  onClick={() => { setShowDeleteModal(false); setEmpresaToDelete(null); }}
+                  className={`${styles.btn} ${styles.cancelButton}`}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  className={`${styles.btn} ${styles.saveButton}`}
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </main>
     </>
   );

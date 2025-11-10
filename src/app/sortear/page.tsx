@@ -4,9 +4,9 @@ import { useEffect, useState, useRef } from "react";
 import Sidebar from "../components/Header";
 import styles from "./page.module.css";
 
-const API_VENTAS = "http://localhost:8080/v1/azzar/ventas/reporte-por-premio";
-const API_PREMIOS = "http://localhost:8080/v1/azzar/premios";
-const API_SORTEO = "http://localhost:8080/v1/azzar/agente/sorteo";
+const API_VENTAS = "http://148.230.72.52:8080/v1/azzar/ventas/reporte-por-premio";
+const API_PREMIOS = "http://148.230.72.52:8080/v1/azzar/premios";
+const API_SORTEO = "http://148.230.72.52:8080/v1/azzar/agente/sorteo";
 
 export default function SorteoPage() {
   const [selectedPremio, setSelectedPremio] = useState<number | null>(null);
@@ -43,7 +43,8 @@ export default function SorteoPage() {
       const res = await fetch(`${API_VENTAS}/${premioId}`);
       if (!res.ok) throw new Error(`Error ${res.status}`);
       const data = await res.json();
-      const mapped = data.map((v: any) => ({
+      const mapped = data.map((v: any, index: number) => ({
+        uid: `${v.idRifa}-${v.numeroRifa}-${index}`, // 🔑 clave única
         id: v.idRifa,
         ticket: v.numeroRifa,
         comprador: v.nombreCliente,
@@ -64,85 +65,78 @@ export default function SorteoPage() {
   const toggleAgente = () => setAgenteActivo(prev => !prev);
 
   const handleStartSorteo = async () => {
-  if (!selectedPremio || ventas.length === 0) return;
+    if (!selectedPremio || ventas.length === 0) return;
 
-  const activos = ventas.filter(v => v.estado === 1);
-  if (activos.length === 0) {
-    alert("No hay tickets activos para sortear.");
-    return;
-  }
-
-  setIsSorteando(true);
-  setGanador(null);
-
-  // Empieza animación ruleta
-  ruletaInterval.current = setInterval(() => {
-    setIndiceVisual(prev => (prev + 1) % ventas.length);
-  }, 80);
-
-  try {
-    const res = await fetch(`${API_SORTEO}/${selectedPremio}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "agenteHabilitado": agenteActivo.toString(),
-      },
-    });
-
-    if (!res.ok) throw new Error("Error en sorteo");
-
-    const data = await res.json();
-
-    // 🔧 Normalizamos ambos formatos de ticket (con ceros o sin ceros)
-    const normalize = (t: string) => t.replace(/^0+/, "");
-    const ganadorReal =
-      ventas.find(
-        v => normalize(v.ticket) === normalize(data.numeroRifa.toString())
-      ) || {
-        id: data.idRifa,
-        ticket: data.numeroRifa,
-        comprador: data.nombreCliente,
-      };
-
-    // 🔄 Si el ganador no está en la lista, lo agregamos visualmente
-    if (!ventas.some(v => v.ticket === ganadorReal.ticket)) {
-      setVentas(prev => [...prev, ganadorReal]);
+    const activos = ventas.filter(v => v.estado === 2);
+    if (activos.length === 0) {
+      alert("No hay tickets activos para sortear.");
+      return;
     }
 
-    // Simulamos animación de 3 segundos y luego detenemos la ruleta
-    setTimeout(() => handleStopSorteo(ganadorReal), 3000);
-  } catch (err) {
-    console.error("Error en sorteo:", err);
-    handleStopSorteo(null);
-  }
-};
+    setIsSorteando(true);
+    setGanador(null);
 
-const handleStopSorteo = (ganadorData: any | null) => {
-  if (ruletaInterval.current) {
-    clearInterval(ruletaInterval.current);
-    ruletaInterval.current = null;
-  }
+    // 🎡 Empieza animación ruleta
+    ruletaInterval.current = setInterval(() => {
+      setIndiceVisual(prev => (prev + 1) % ventas.length);
+    }, 80);
 
-  setIsSorteando(false);
+    try {
+      const res = await fetch(`${API_SORTEO}/${selectedPremio}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "agenteHabilitado": agenteActivo.toString(),
+        },
+      });
 
-  if (ganadorData) {
-    const normalize = (t: string) => t.replace(/^0+/, "");
-    const index = ventas.findIndex(
-      v => normalize(v.ticket) === normalize(ganadorData.ticket.toString())
-    );
+      if (!res.ok) throw new Error("Error en sorteo");
 
-    // Si lo encuentra, alineamos la ruleta
-    if (index >= 0) {
-      setIndiceVisual(index);
-    } else {
-      // Si no existe, agregamos al final y mostramos
-      setIndiceVisual(ventas.length);
+      const data = await res.json();
+
+      const normalize = (t: string) => t.replace(/^0+/, "");
+      const ganadorReal =
+        ventas.find(
+          v => normalize(v.ticket) === normalize(data.numeroRifa.toString())
+        ) || {
+          uid: `nuevo-${data.idRifa}-${Date.now()}`,
+          id: data.idRifa,
+          ticket: data.numeroRifa,
+          comprador: data.nombreCliente,
+        };
+
+      if (!ventas.some(v => v.ticket === ganadorReal.ticket)) {
+        setVentas(prev => [...prev, ganadorReal]);
+      }
+
+      // 🕐 Esperamos 3 segundos de animación antes de detener
+      setTimeout(() => handleStopSorteo(ganadorReal), 3000);
+    } catch (err) {
+      console.error("Error en sorteo:", err);
+      handleStopSorteo(null);
+    }
+  };
+
+  const handleStopSorteo = (ganadorData: any | null) => {
+    if (ruletaInterval.current) {
+      clearInterval(ruletaInterval.current);
+      ruletaInterval.current = null;
     }
 
-    setGanador(ganadorData);
-  }
-};
+    setIsSorteando(false);
 
+    if (ganadorData) {
+      const normalize = (t: string) => t.replace(/^0+/, "");
+      const index = ventas.findIndex(
+        v => normalize(v.ticket) === normalize(ganadorData.ticket.toString())
+      );
+
+      if (index >= 0) setIndiceVisual(index);
+      else setIndiceVisual(ventas.length);
+
+      setGanador(ganadorData);
+    }
+  };
 
   const getVisibleIndices = () => {
     if (ventas.length === 0) return [];
@@ -195,30 +189,30 @@ const handleStopSorteo = (ganadorData: any | null) => {
         {ventas.length > 0 && (
           <div className={styles.ruletaContainer}>
             {getVisibleIndices().map((idx, position) => {
-  const venta = ventas[idx];
-  const pos = position - 2;
-  const isCenter = pos === 0;
-  const isGanador = ganador && ganador.ticket === venta.ticket;
-  return (
-            <div
-              key={`${venta.id ?? venta.ticket}-${idx}`}
-              className={`${styles.ruletaItem} ${isGanador ? styles.ganadorItem : ""}`}
-              style={{
-                transform: `scale(${isCenter ? 1.1 : pos === 1 || pos === -1 ? 0.9 : 0.75})`,
-                opacity: isCenter ? 1 : 0.6,
-                backgroundColor: isGanador
-                  ? "#00b894"
-                  : isCenter
-                  ? "#dfe6e9"
-                  : "#f1f2f6",
-                transition: "transform 0.2s, background-color 0.3s",
-              }}
-            >
-              {venta.ticket} - {venta.comprador}
-            </div>
-          );
-        })}
+              const venta = ventas[idx];
+              const pos = position - 2;
+              const isCenter = pos === 0;
+              const isGanador = ganador && ganador.ticket === venta.ticket;
 
+              return (
+                <div
+                  key={`${venta.uid}-${position}-${indiceVisual}`} // ✅ Clave completamente única
+                  className={`${styles.ruletaItem} ${isGanador ? styles.ganadorItem : ""}`}
+                  style={{
+                    transform: `scale(${isCenter ? 1.1 : pos === 1 || pos === -1 ? 0.9 : 0.75})`,
+                    opacity: isCenter ? 1 : 0.6,
+                    backgroundColor: isGanador
+                      ? "#00b894"
+                      : isCenter
+                      ? "#dfe6e9"
+                      : "#f1f2f6",
+                    transition: "all 0.3s ease",
+                  }}
+                >
+                  {venta.ticket} - {venta.comprador}
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -244,7 +238,7 @@ const handleStopSorteo = (ganadorData: any | null) => {
         {ganador && !isSorteando && (
           <div className={styles.ganador}>
             <strong>{ganador.comprador}</strong> ganó con el ticket{" "}
-            <strong>#{ganador.ticket}</strong> 
+            <strong>#{ganador.ticket}</strong>
           </div>
         )}
       </main>

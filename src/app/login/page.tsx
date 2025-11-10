@@ -6,7 +6,7 @@ import styles from "./page.module.css";
 import { jwtDecode } from "jwt-decode";
 import { useRouter } from "next/navigation";
 
-const API_URL = "http://localhost:8080/v1/azzar/admin/login";
+const API_URL = "http://148.230.72.52:8080/v1/azzar/admin/login";
 
 export default function LoginPage() {
     const { login } = useAuth();
