@@ -8,6 +8,7 @@ const API_URL = "http://148.230.72.52:8080/v1/azzar/empresas-afiliadas";
 const API_URL_INSERT = "http://148.230.72.52:8080/v1/azzar/empresas-afiliadas/registrar";
 const API_URL_UPDATE = "http://148.230.72.52:8080/v1/azzar/empresas-afiliadas";
 const API_URL_DELETE = "http://148.230.72.52:8080/v1/azzar/empresas-afiliadas";
+const API_ADMIN = "http://148.230.72.52:8080/v1/azzar/admin";
 
 export default function EmpresasPage() {
   const [empresas, setEmpresas] = useState<any[]>([]);
@@ -92,6 +93,21 @@ export default function EmpresasPage() {
     }
   };
 
+  const obtenerUsuarioPorEmpresa = async (idEmpresa: number) => {
+    try {
+      const res = await fetch(`${API_ADMIN}/empresa/{idEmpresa}?idEmpresa=${idEmpresa}`);
+      if (res.status === 404) return null; // no existe usuario
+      if (!res.ok) throw new Error("Error consultando usuario");
+
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      console.error("Error al obtener usuario de empresa", err);
+      return null;
+    }
+  };
+
+
   const handleDelete = async () => {
     if (!empresaToDelete) return;
     setLoading(true);
@@ -113,6 +129,135 @@ export default function EmpresasPage() {
     const id = e.idEmpresa?.toString() || "";
     return nombre.toLowerCase().includes(search.toLowerCase()) || id.includes(search);
   });
+
+
+  // Estado para usuarios
+  const [showUserCreateModal, setShowUserCreateModal] = useState(false);
+  const [showUserEditModal, setShowUserEditModal] = useState(false);
+  const [showUserDeleteModal, setShowUserDeleteModal] = useState(false);
+
+  const [empresaUsuario, setEmpresaUsuario] = useState<any>(null);
+
+  const [usuarioForm, setUsuarioForm] = useState({
+    usuario: "",
+    password: ""
+  });
+
+  const openCreateUserModal = (empresa: any) => {
+    setEmpresaUsuario(empresa);
+    setUsuarioForm({ usuario: "", password: "" });
+    setShowUserCreateModal(true);
+  };
+
+  const openEditUserModal = async (empresa: any) => {
+    setEmpresaUsuario(empresa);
+
+    const usuario = await obtenerUsuarioPorEmpresa(empresa.idEmpresa);
+
+    if (!usuario) {
+      alert("Esta empresa NO tiene un usuario para editar.");
+      return;
+    }
+
+    setUsuarioForm({
+      usuario: usuario.usuario || "",
+      password: ""
+    });
+
+    setShowUserEditModal(true);
+  };
+
+  const openDeleteUserModal = (empresa: any) => {
+    setEmpresaUsuario(empresa);
+    setShowUserDeleteModal(true);
+  };
+
+  const handleUserChange = (e: any) => {
+    const { name, value } = e.target;
+    setUsuarioForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const crearUsuarioAdmin = async (empresa: any) => {
+    const usuarioExiste = await obtenerUsuarioPorEmpresa(empresa.idEmpresa);
+
+    if (usuarioExiste) {
+      alert("Esta empresa ya tiene un usuario. Usa editar.");
+      return;
+    }
+
+    try {
+      const body = {
+        idEmpresa: empresa.idEmpresa,
+        usuario: usuarioForm.usuario,
+        contrasena: usuarioForm.password
+      };
+
+      const res = await fetch(`${API_ADMIN}/registrar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) throw new Error("Error al crear usuario");
+
+      alert("Usuario creado correctamente");
+      setShowUserCreateModal(false);
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const editarUsuarioAdmin = async (empresa: any) => {
+    const usuario = await obtenerUsuarioPorEmpresa(empresa.idEmpresa);
+
+    if (!usuario) {
+      alert("Esta empresa NO tiene un usuario para editar.");
+      return;
+    }
+
+    try {
+      const body = {
+        usuario: usuarioForm.usuario,
+        contrasena: usuarioForm.password.trim() === "" ? null : usuarioForm.password
+      };
+
+      const res = await fetch(`${API_ADMIN}/${usuario.idUsuario}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) throw new Error("Error al editar usuario");
+
+      alert("Usuario actualizado correctamente");
+      setShowUserEditModal(false);
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const eliminarUsuarioAdmin = async (empresa: any) => {
+    const usuario = await obtenerUsuarioPorEmpresa(empresa.idEmpresa);
+
+    if (!usuario) {
+      alert("⚠️ Esta empresa NO tiene usuario creado.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_ADMIN}/${usuario.idUsuario}`, {
+        method: "DELETE"
+      });
+
+      if (!res.ok) throw new Error("Error al eliminar usuario");
+
+      alert("Usuario eliminado correctamente");
+      setShowUserDeleteModal(false);
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
 
   return (
     <>
@@ -163,6 +308,7 @@ export default function EmpresasPage() {
                   <th>Nombre</th>
                   <th>Alquiler desde</th>
                   <th>Alquiler hasta</th>
+                  <th>Usuario</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
@@ -174,6 +320,32 @@ export default function EmpresasPage() {
                       <td>{e.nombreEmpresa}</td>
                       <td>{new Date(e.fechaDesdeAlquiler).toLocaleDateString("es-ES")}</td>
                       <td>{new Date(e.fechaHastaAlquiler).toLocaleDateString("es-ES")}</td>
+                      <td>
+                        <button
+                          title="Agregar usuario"
+                          className={styles.iconButton}
+                          onClick={() => openCreateUserModal(e)}
+                        >
+                          <span className="material-symbols-outlined">person_add</span>
+                        </button>
+
+                        <button
+                          title="Editar usuario"
+                          className={styles.iconButton}
+                          onClick={() => openEditUserModal(e)}
+                        >
+                          <span className="material-symbols-outlined">edit_square</span>
+                        </button>
+
+                        <button
+                          title="Eliminar usuario"
+                          className={styles.iconButton}
+                          onClick={() => openDeleteUserModal(e)}
+                        >
+                          <span className="material-symbols-outlined">person_remove</span>
+                        </button>
+                      </td>
+
                       <td className={styles.actionsCell}>
                         <button
                           title="Editar"
@@ -305,6 +477,140 @@ export default function EmpresasPage() {
             </div>
           </div>
         )}
+
+
+        {showUserCreateModal && empresaUsuario && (
+          <div className={styles.modal}>
+            <div className={styles.modalContent}>
+              <h2 className={styles.modalTitle}>Crear Usuario</h2>
+
+              <form className={styles.form}>
+                <label className={styles.inputLabel}>
+                  Usuario
+                  <input
+                    type="text"
+                    name="usuario"
+                    value={usuarioForm.usuario}
+                    onChange={handleUserChange}
+                    className={styles.inputText}
+                    required
+                  />
+                </label>
+
+                <label className={styles.inputLabel}>
+                  Contraseña
+                  <input
+                    type="password"
+                    name="password"
+                    value={usuarioForm.password}
+                    onChange={handleUserChange}
+                    className={styles.inputText}
+                    required
+                  />
+                </label>
+
+                <div className={styles.modalActions}>
+                  <button
+                    type="button"
+                    onClick={() => { setShowUserCreateModal(false); }}
+                    className={`${styles.btn} ${styles.cancelButton}`}
+                  >
+                    Cancelar
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`${styles.btn} ${styles.saveButton}`}
+                    onClick={() => crearUsuarioAdmin(empresaUsuario)}
+                  >
+                    Crear
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {showUserEditModal && empresaUsuario && (
+          <div className={styles.modal}>
+            <div className={styles.modalContent}>
+              <h2 className={styles.modalTitle}>Editar Usuario</h2>
+
+              <form className={styles.form}>
+                <label className={styles.inputLabel}>
+                  Usuario
+                  <input
+                    type="text"
+                    name="usuario"
+                    value={usuarioForm.usuario}
+                    onChange={handleUserChange}
+                    className={styles.inputText}
+                    required
+                  />
+                </label>
+
+                <label className={styles.inputLabel}>
+                  Nueva contraseña (opcional)
+                  <input
+                    type="password"
+                    name="password"
+                    value={usuarioForm.password}
+                    onChange={handleUserChange}
+                    className={styles.inputText}
+                  />
+                </label>
+
+                <div className={styles.modalActions}>
+                  <button
+                    type="button"
+                    onClick={() => { setShowUserEditModal(false); }}
+                    className={`${styles.btn} ${styles.cancelButton}`}
+                  >
+                    Cancelar
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`${styles.btn} ${styles.saveButton}`}
+                    onClick={() => editarUsuarioAdmin(empresaUsuario)}
+                  >
+                    Guardar Cambios
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {showUserDeleteModal && empresaUsuario && (
+          <div className={styles.modal}>
+            <div className={styles.modalContent}>
+              <h2 className={styles.modalTitle}>Eliminar Usuario</h2>
+
+              <p>
+                ¿Seguro que deseas eliminar el usuario de la empresa <b>{empresaUsuario.nombreEmpresa}</b>?
+              </p>
+
+              <div className={styles.modalActions}>
+                <button
+                  type="button"
+                  onClick={() => { setShowUserDeleteModal(false); }}
+                  className={`${styles.btn} ${styles.cancelButton}`}
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => eliminarUsuarioAdmin(empresaUsuario)}
+                  className={`${styles.btn} ${styles.saveButton}`}
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
 
       </main>
     </>

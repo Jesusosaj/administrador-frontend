@@ -43,6 +43,7 @@ export default function VentasPage() {
       if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`);
 
       const data = await response.json();
+      console.log(data);
       const mappedPagos = data.map((p: any) => ({
         ...p,
         fechaConfirmacionFormateada: new Date(p.fechaConfirmacion).toLocaleString("es-ES", {
