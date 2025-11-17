@@ -1,0 +1,34 @@
+# Etapa 1: build
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copiar package.json y package-lock.json
+COPY package*.json ./
+
+# Instalar dependencias
+RUN npm install
+
+# Copiar el resto del proyecto
+COPY . .
+
+# Construir la app
+RUN npm run build:docker
+
+# Etapa 2: producción
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copiar dependencias instaladas y build
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/next.config.ts ./next.config.ts
+
+# Exponer el puerto
+EXPOSE 5172
+
+# Comando para producción
+CMD ["npm", "start"]

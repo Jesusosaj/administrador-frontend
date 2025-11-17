@@ -43,19 +43,20 @@ export default function SorteoPage() {
       const res = await fetch(`${API_VENTAS}/${premioId}`);
       if (!res.ok) throw new Error(`Error ${res.status}`);
       const data = await res.json();
+
       const mapped = data.map((v: any, index: number) => ({
-        uid: `${v.idRifa}-${v.numeroRifa}-${index}`, // 🔑 clave única
+        uid: `${v.idRifa}-${v.numeroRifa}-${index}`,
         id: v.idRifa,
         ticket: v.numeroRifa,
         comprador: v.nombreCliente,
         sexo: v.sexo,
         estado: v.estadoVenta,
       }));
+
       setVentas(mapped);
       setGanador(null);
       setIndiceVisual(0);
     } catch (err: any) {
-      console.error("Error cargando ventas:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -76,7 +77,6 @@ export default function SorteoPage() {
     setIsSorteando(true);
     setGanador(null);
 
-    // 🎡 Empieza animación ruleta
     ruletaInterval.current = setInterval(() => {
       setIndiceVisual(prev => (prev + 1) % ventas.length);
     }, 80);
@@ -90,11 +90,9 @@ export default function SorteoPage() {
         },
       });
 
-      if (!res.ok) throw new Error("Error en sorteo");
-
       const data = await res.json();
-
       const normalize = (t: string) => t.replace(/^0+/, "");
+
       const ganadorReal =
         ventas.find(
           v => normalize(v.ticket) === normalize(data.numeroRifa.toString())
@@ -105,35 +103,25 @@ export default function SorteoPage() {
           comprador: data.nombreCliente,
         };
 
-      if (!ventas.some(v => v.ticket === ganadorReal.ticket)) {
-        setVentas(prev => [...prev, ganadorReal]);
-      }
-
-      // 🕐 Esperamos 3 segundos de animación antes de detener
       setTimeout(() => handleStopSorteo(ganadorReal), 3000);
-    } catch (err) {
-      console.error("Error en sorteo:", err);
+    } catch {
       handleStopSorteo(null);
     }
   };
 
   const handleStopSorteo = (ganadorData: any | null) => {
-    if (ruletaInterval.current) {
-      clearInterval(ruletaInterval.current);
-      ruletaInterval.current = null;
-    }
+    if (ruletaInterval.current) clearInterval(ruletaInterval.current);
 
     setIsSorteando(false);
 
     if (ganadorData) {
       const normalize = (t: string) => t.replace(/^0+/, "");
+
       const index = ventas.findIndex(
         v => normalize(v.ticket) === normalize(ganadorData.ticket.toString())
       );
 
-      if (index >= 0) setIndiceVisual(index);
-      else setIndiceVisual(ventas.length);
-
+      setIndiceVisual(index >= 0 ? index : ventas.length);
       setGanador(ganadorData);
     }
   };
@@ -151,97 +139,109 @@ export default function SorteoPage() {
   return (
     <>
       <Sidebar />
-      <main className={styles.main}>
-        <div className={styles.filters}>
-          <select
-            value={selectedPremio || ""}
-            onChange={(e) => {
-              const id = parseInt(e.target.value);
-              setSelectedPremio(id);
-              fetchVentas(id);
-            }}
-            className={styles.select}
-          >
-            <option value="">Seleccionar Premio</option>
-            {premios.map((p) => (
-              <option key={p.idPremio} value={p.idPremio}>
-                {p.nombrePremio}
-              </option>
-            ))}
-          </select>
 
+      <div className={styles.mainContent}>
+        {/* ------- LISTA IZQUIERDA DE PREMIOS ------- */}
+        <aside className={styles.sidebarPremios}>
           <button
             onClick={toggleAgente}
             className={`${styles.toggleBtn} ${agenteActivo ? styles.active : styles.inactive}`}
           >
-            <span className={`material-symbols-outlined ${agenteActivo ? styles.toggleOn : styles.toggleOff}`}>
+            <span className="material-symbols-outlined">
               {agenteActivo ? "toggle_on" : "toggle_off"}
             </span>
             Agente Inteligente
           </button>
-        </div>
+          <h3 className={styles.sidebarTitle}>Premios</h3>
 
-        {loading && <div className={styles.loading}>Cargando ventas...</div>}
-        {error && <div className={styles.error}>{error}</div>}
+          <div className={styles.premiosList}>
+            {premios.map((p) => (
+              <div
+                key={p.idPremio}
+                className={`${styles.premioItem} ${selectedPremio === p.idPremio ? styles.premioItemActivo : ""}`}
+                onClick={() => {
+                  if (selectedPremio === p.idPremio) {
+                    // 🔹 Deseleccionar
+                    setSelectedPremio(null);
+                    setVentas([]);
+                    setGanador(null);
+                  } else {
+                    // 🔹 Seleccionar
+                    setSelectedPremio(p.idPremio);
+                    fetchVentas(p.idPremio);
+                  }
+                }}
+              >
+                {p.nombrePremio}
+              </div>
+            ))}
+          </div>
+        </aside>
 
-        {nombrePremio && <h2 className={styles.premioTitle}>{nombrePremio}</h2>}
+        {/* ------- SORTEO A LA DERECHA ------- */}
+        <main className={styles.mainRight}>
+          {selectedPremio && <h2 className={styles.premioTitle}>{nombrePremio}</h2>}
 
-        {ventas.length > 0 && (
-          <div className={styles.ruletaContainer}>
-            {getVisibleIndices().map((idx, position) => {
-              const venta = ventas[idx];
-              const pos = position - 2;
-              const isCenter = pos === 0;
-              const isGanador = ganador && ganador.ticket === venta.ticket;
+          {loading && <div className={styles.loading}>Cargando ventas...</div>}
+          {error && <div className={styles.error}>{error}</div>}
 
-              return (
-                <div
-                  key={`${venta.uid}-${position}-${indiceVisual}`} // ✅ Clave completamente única
-                  className={`${styles.ruletaItem} ${isGanador ? styles.ganadorItem : ""}`}
-                  style={{
-                    transform: `scale(${isCenter ? 1.1 : pos === 1 || pos === -1 ? 0.9 : 0.75})`,
-                    opacity: isCenter ? 1 : 0.6,
-                    backgroundColor: isGanador
-                      ? "#00b894"
-                      : isCenter
-                      ? "#dfe6e9"
-                      : "#f1f2f6",
-                    transition: "all 0.3s ease",
-                  }}
+          {ventas.length > 0 && (
+            <>
+              {/* Ruleta */}
+              <div className={styles.ruletaContainer}>
+                {getVisibleIndices().map((idx, position) => {
+                  const venta = ventas[idx];
+                  const pos = position - 2;
+                  const isCenter = pos === 0;
+                  const isGanador = ganador && ganador.ticket === venta.ticket;
+
+                  return (
+                    <div
+                      key={`${venta.uid}-${position}-${indiceVisual}`}
+                      className={`${styles.ruletaItem} ${isGanador ? styles.ganadorItem : ""}`}
+                      style={{
+                        transform: `scale(${isCenter ? 1.1 : pos === 1 || pos === -1 ? 0.9 : 0.75})`,
+                        opacity: isCenter ? 1 : 0.6,
+                        backgroundColor: isGanador
+                          ? "#00b894"
+                          : isCenter
+                          ? "#dfe6e9"
+                          : "#f1f2f6",
+                      }}
+                    >
+                      {venta.ticket} - {venta.comprador}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className={styles.buttonsContainer}>
+                <button
+                  onClick={handleStartSorteo}
+                  disabled={isSorteando}
+                  className={styles.sortearBtn}
                 >
-                  {venta.ticket} - {venta.comprador}
+                  Sortear
+                </button>
+                <button
+                  onClick={() => handleStopSorteo(ganador)}
+                  disabled={!isSorteando}
+                  className={styles.sortearBtn}
+                >
+                  Parar
+                </button>
+              </div>
+
+              {ganador && !isSorteando && (
+                <div className={styles.ganador}>
+                  <strong>{ganador.comprador}</strong> ganó con el ticket{" "}
+                  <strong>#{ganador.ticket}</strong>
                 </div>
-              );
-            })}
-          </div>
-        )}
-
-        {selectedPremio && ventas.length > 0 && (
-          <div className={styles.buttonsContainer}>
-            <button
-              onClick={handleStartSorteo}
-              disabled={isSorteando}
-              className={styles.sortearBtn}
-            >
-              Sortear
-            </button>
-            <button
-              onClick={() => handleStopSorteo(ganador)}
-              disabled={!isSorteando}
-              className={styles.sortearBtn}
-            >
-              Parar
-            </button>
-          </div>
-        )}
-
-        {ganador && !isSorteando && (
-          <div className={styles.ganador}>
-            <strong>{ganador.comprador}</strong> ganó con el ticket{" "}
-            <strong>#{ganador.ticket}</strong>
-          </div>
-        )}
-      </main>
+              )}
+            </>
+          )}
+        </main>
+      </div>
     </>
   );
 }

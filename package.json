@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
-    "start": "next start",
-    "lint": "eslint"
+    "build": "next build",
+    "start": "next start -p 5172",
+    "lint": "eslint",
+    "build:docker": "next build"
   },
   "dependencies": {
     "framer-motion": "^12.23.24",

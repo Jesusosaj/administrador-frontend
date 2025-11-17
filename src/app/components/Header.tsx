@@ -1,13 +1,29 @@
-// app/components/Sidebar.tsx
 "use client";
 
 import { useAuth } from "../context/AuthContext";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
   const pathname = usePathname();
+
+  // 🟢 Estado para guardar el id del token
+  const [adminId, setAdminId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1])); // decodifica JWT
+      console.log(payload);
+      setAdminId(payload.idEmpresa); // 🟢 Guardamos el ID del token
+    } catch (e) {
+      console.error("Token inválido:", e);
+    }
+  }, []);
 
   const menuItems = [
     { href: "/panel", label: "Panel de Inicio", icon: "dashboard" },
@@ -59,50 +75,47 @@ export default function Sidebar() {
       {/* Menú */}
       <nav style={{ flex: 1, padding: "0 16px" }}>
         <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-          {menuItems.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <li key={item.href} style={{ marginBottom: "4px" }}>
-                <Link
-                  href={item.href}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    padding: "10px 16px",
-                    borderRadius: "8px",
-                    color: "#ecf0f1",
-                    textDecoration: "none",
-                    fontWeight: 500,
-                    borderBottom: isActive
-                      ? "2px solid #1abc9c"
-                      : "2px solid transparent",
-                    transition: "all 0.2s ease",
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.borderBottom = "2px solid #1abc9c")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.borderBottom = isActive
-                      ? "2px solid #1abc9c"
-                      : "2px solid transparent")
-                  }
-                >
-                  <span
-                    className="material-symbols-outlined"
+          {menuItems
+            .filter((item) => {
+              // 🛑 Solo mostrar "Empresas" si el ID es -99
+              if (item.href === "/empresas" && adminId !== -99) return false;
+              return true;
+            })
+            .map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <li key={item.href} style={{ marginBottom: "4px" }}>
+                  <Link
+                    href={item.href}
                     style={{
-                      fontSize: "20px",
-                      color: isActive ? "#1abc9c" : "#ecf0f1",
-                      transition: "color 0.2s ease",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      padding: "10px 16px",
+                      borderRadius: "8px",
+                      color: "#ecf0f1",
+                      textDecoration: "none",
+                      fontWeight: 500,
+                      borderBottom: isActive
+                        ? "2px solid #1abc9c"
+                        : "2px solid transparent",
+                      transition: "all 0.2s ease",
                     }}
                   >
-                    {item.icon}
-                  </span>
-                  {item.label}
-                </Link>
-              </li>
-            );
-          })}
+                    <span
+                      className="material-symbols-outlined"
+                      style={{
+                        fontSize: "20px",
+                        color: isActive ? "#1abc9c" : "#ecf0f1",
+                      }}
+                    >
+                      {item.icon}
+                    </span>
+                    {item.label}
+                  </Link>
+                </li>
+              );
+            })}
         </ul>
       </nav>
 
@@ -120,10 +133,7 @@ export default function Sidebar() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span
-              className="material-symbols-outlined"
-              style={{ fontSize: "20px", color: "#ecf0f1" }}
-            >
+            <span className="material-symbols-outlined" style={{ fontSize: "20px" }}>
               account_circle
             </span>
             <strong style={{ fontSize: "14px", color: "#bdc3c7" }}>
